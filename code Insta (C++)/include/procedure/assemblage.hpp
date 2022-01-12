@@ -324,31 +324,39 @@ namespace procedure {
 
     // modifie les lignes associées au bord pour y mettre l'identité
     void pseudoElimination (MatriceL& matrix, const datastructure::bordermgr& bman, int cardBaseV) {
+        std::cout << "Entrée dans pseudo-élimination" << std::endl;
         int nelem=0, ielem=0, col=0, jnode=0;
         double alpha = 0.0;
+        bool stillInMat = false;
         
         // beaucoup de bruit pour rien (mais c'est fun) : ne pas perturber *du tout* le conditionnement
         // soit mat la partie de la matrice qui va rester, et nmat = [mat, 0; 0, alpha*Id] la nouvelle (à une permutation près)
         // plan : prendre alpha = racine d'une combinaison convexe des valeurs propres de mat^t * mat
         // comme ça, sp(nmat^t * nmat) = sp(mat^t * mat) U {alpha^2} et le conditionnement de nmat (en norme 2)
         // est inchangé. Donc on prend alpha = sqrt(trace(mat^t * mat)/taille(mat)), hihi
-        for (int inode : bman.mesh_to_memory) { // pour chaque ligne
+        for (int inode : bman.memory_to_mesh) { // pour chaque ligne de l'intérieur
             nelem = matrix.getNbTermL (2*inode); // partie x
-            for (ielem=0; ielem<nelem; ++ielem) { 
+            stillInMat = true; ielem=0;
+            while (stillInMat && ielem < nelem) {
                 col = matrix.getIndLC (2*inode, ielem);
-                if (bman.isInside.at(col))
+                stillInMat = (col < 2*cardBaseV);
+                if (stillInMat && bman.isInside.at(std::floor(col/2)))
                     alpha += matrix(2*inode, col) * matrix(col, 2*inode);
+                ++ielem;
             }
             nelem = matrix.getNbTermL (2*inode+1); // partie y
-            for (ielem=0; ielem<nelem; ++ielem) { 
+            stillInMat = true; ielem=0;
+            while (stillInMat && ielem < nelem) {
                 col = matrix.getIndLC (2*inode+1, ielem);
-                if (bman.isInside.at(col))
+                stillInMat = (col < 2*cardBaseV);
+                if (stillInMat && bman.isInside.at(std::floor(col/2)))
                     alpha += matrix(2*inode+1, col) * matrix(col, 2*inode+1);
+                ++ielem;
             }
         }
         alpha = std::sqrt(alpha / (2.0 * cardBaseV));
 
-        int inode=0, jnode=0;
+        int inode=0;
         for (int node=0; node < cardBaseV; ++node) {
             if (!bman.isInside.at(node)) {
                 // première partie : les x
@@ -375,6 +383,7 @@ namespace procedure {
                 matrix.set (2*node+1, 2*node+1, alpha);
             }
         }
+        std::cout << "Sortie de pseudo-élimination" << std::endl;
     }
 
     datastructure::schemas assemblerschemas (const std::string& insta_name, const std::string& mesh_name, 
